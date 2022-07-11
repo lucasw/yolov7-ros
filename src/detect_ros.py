@@ -65,18 +65,15 @@ class YoloV7:
 
 
 class Yolov7Publisher:
-    def __init__(self, img_topic: str, weights: str, conf_thresh: float = 0.5,
-                 iou_thresh: float = 0.45, pub_topic: str = "yolov7_detections",
+    def __init__(self, weights: str, conf_thresh: float = 0.5,
+                 iou_thresh: float = 0.45,
                  device: str = "cuda",
                  img_size: Union[Tuple[int, int], None] = (640, 640),
                  queue_size: int = 1, visualize: bool = False):
         """
-        :param img_topic: name of the image topic to listen to
         :param weights: path/to/yolo_weights.pt
         :param conf_thresh: confidence threshold
         :param iou_thresh: intersection over union threshold
-        :param pub_topic: name of the output topic (will be published under the
-            namespace '/yolov7')
         :param device: device to do inference on (e.g., 'cuda' or 'cpu')
         :param queue_size: queue size for publishers
         :visualize: flag to enable publishing the detections visualized in the image
@@ -87,10 +84,8 @@ class Yolov7Publisher:
         self.img_size = img_size
         self.device = device
 
-        vis_topic = pub_topic + "visualization" if pub_topic.endswith("/") else \
-            pub_topic + "/visualization"
         self.visualization_publisher = rospy.Publisher(
-            vis_topic, Image, queue_size=queue_size
+            "viz_image", Image, queue_size=queue_size
         ) if visualize else None
 
         self.bridge = CvBridge()
@@ -101,10 +96,10 @@ class Yolov7Publisher:
             device=device
         )
         self.img_subscriber = rospy.Subscriber(
-            img_topic, Image, self.process_img_msg
+            "image", Image, self.process_img_msg
         )
         self.detection_publisher = rospy.Publisher(
-            pub_topic, Detection2DArray, queue_size=queue_size
+            "detection2d", Detection2DArray, queue_size=queue_size
         )
 
     def process_img_msg(self, img_msg: Image):
@@ -152,23 +147,20 @@ class Yolov7Publisher:
             classes = [int(c) for c in detections[:, 5].tolist()]
             vis_img = draw_detections(np_img_orig, bboxes, classes)
             vis_msg = self.bridge.cv2_to_imgmsg(vis_img)
+            vis_msg.encoding = img_msg.encoding
             self.visualization_publisher.publish(vis_msg)
 
 
 if __name__ == "__main__":
     rospy.init_node("yolov7_node")
 
-    ns = rospy.get_name() + "/"
-
-    weights_path = rospy.get_param(ns + "weights_path")
-    img_topic = rospy.get_param(ns + "img_topic")
-    out_topic = rospy.get_param(ns + "out_topic")
-    conf_thresh = rospy.get_param(ns + "conf_thresh")
-    iou_thresh = rospy.get_param(ns + "iou_thresh")
-    queue_size = rospy.get_param(ns + "queue_size")
-    img_size = rospy.get_param(ns + "img_size")
-    visualize = rospy.get_param(ns + "visualize")
-    device = rospy.get_param(ns + "device")
+    weights_path = rospy.get_param("~weights_path")
+    conf_thresh = rospy.get_param("~conf_thresh")
+    iou_thresh = rospy.get_param("~iou_thresh")
+    queue_size = rospy.get_param("~queue_size")
+    img_size = rospy.get_param("~img_size")
+    visualize = rospy.get_param("~visualize")
+    device = rospy.get_param("~device")
 
     # some sanity checks
     if not os.path.isfile(weights_path):
@@ -178,8 +170,6 @@ if __name__ == "__main__":
         raise ValueError("Check your device.")
 
     publisher = Yolov7Publisher(
-        img_topic=img_topic,
-        pub_topic=out_topic,
         weights=weights_path,
         device=device,
         visualize=visualize,

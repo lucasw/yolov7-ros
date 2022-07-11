@@ -1,24 +1,24 @@
+<?xml version="1.0"?>
 <launch>
-    <node pkg="yolov7-ros" type="detect_ros.py" name="detect" output="screen"
-    ns="yolov7">
-        <!-- Download the official weights from the original repo -->
-        <param name="weights_path" type="str" value="" />
-        <!-- topic name to subscribe to -->
-        <param name="img_topic" type="str" value="/raw_image" />
-        <!-- topic name for the detection output -->
-        <param name="out_topic" type="str" value="yolov7" />
-        <!-- confidence threshold -->
-        <param name="conf_thresh" type="double" value="0.4" />
-        <!-- intersection over union threshold -->
-        <param name="iou_thresh" type="double" value="0.45" />
-        <!-- queue size for publishing -->
-        <param name="queue_size" type="int" value="1" />
-        <!-- image size to which to resize each input image before feeding into the
-        network (the final output is rescaled to the original image size) -->
-        <param name="img_size" type="int" value="640" />
-        <!-- flag whether to also publish image with the visualized detections -->
-        <param name="visualize" type="bool" value="true" />
-        <!-- 'cuda' or 'cpu' -->
-        <param name="device" type="str" value="cuda" />
-    </node>
+  <arg name="img_topic" default="image" />
+  <arg name="conf_thresh" default="0.1" doc="confidence threshold" />
+  <arg name="device" default="cuda" doc="'cuda' or 'cpu'" />
+
+  <node name="yolov7" pkg="yolov7-ros" type="detect_ros.py"
+      output="screen">
+    <remap from="image" to="$(arg img_topic)" />
+    <!-- Download the official weights from the original repo -->
+    <param name="weights_path" type="str" value="$(find yolov7-ros)/yolov7/yolov7.pt" />
+    <param name="conf_thresh" type="double" value="$(arg conf_thresh)" />
+    <!-- intersection over union threshold -->
+    <param name="iou_thresh" type="double" value="0.45" />
+    <!-- queue size for publishing -->
+    <param name="queue_size" type="int" value="1" />
+    <!-- image size to which to resize each input image before feeding into the
+    network (the final output is rescaled to the original image size) -->
+    <param name="img_size" type="int" value="640" />
+    <!-- flag whether to also publish image with the visualized detections -->
+    <param name="visualize" type="bool" value="true" />
+    <param name="device" type="str" value="$(arg device)" />
+  </node>
 </launch>
