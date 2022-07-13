@@ -96,11 +96,17 @@ class Yolov7Publisher:
             device=device
         )
         self.img_subscriber = rospy.Subscriber(
-            "image", Image, self.process_img_msg
+            "image", Image, self.img_callback
         )
         self.detection_publisher = rospy.Publisher(
             "detection2d", Detection2DArray, queue_size=queue_size
         )
+
+    def img_callback(self, img_msg: Image):
+        t0 = rospy.Time.now()
+        self.process_img_msg(img_msg)
+        elapsed = rospy.Time.now() - t0
+        rospy.loginfo(f"{elapsed.to_sec():0.3f}")
 
     def process_img_msg(self, img_msg: Image):
         """ callback function for publisher """
