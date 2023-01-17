@@ -68,7 +68,6 @@ class Yolov7Publisher:
     def __init__(self, weights: str, conf_thresh: float = 0.5,
                  iou_thresh: float = 0.45,
                  device: str = "cuda",
-                 img_size: Union[Tuple[int, int], None] = (640, 640),
                  queue_size: int = 1, visualize: bool = False):
         """
         :param weights: path/to/yolo_weights.pt
@@ -77,11 +76,7 @@ class Yolov7Publisher:
         :param device: device to do inference on (e.g., 'cuda' or 'cpu')
         :param queue_size: queue size for publishers
         :visualize: flag to enable publishing the detections visualized in the image
-        :param img_size: (height, width) to which the img is resized before being
-            fed into the yolo network. Final output coordinates will be rescaled to
-            the original img size.
         """
-        self.img_size = img_size
         self.device = device
 
         self.visualization_publisher = rospy.Publisher(
@@ -110,24 +105,33 @@ class Yolov7Publisher:
 
     def process_img_msg(self, img_msg: Image):
         """ callback function for publisher """
+
+        # automatically resize the image to the next smaller possible size
+        # w_scaled, h_scaled = self.img_size
+
         np_img_orig = self.bridge.imgmsg_to_cv2(
             img_msg, desired_encoding='passthrough'
         )
+        h_orig, w_orig, c = np_img_orig.shape
 
         # handle possible different img formats
         if len(np_img_orig.shape) == 2:
             np_img_orig = np.stack([np_img_orig] * 3, axis=2)
 
-        h_orig, w_orig, c = np_img_orig.shape
         if c == 1:
             np_img_orig = np.concatenate([np_img_orig] * 3, axis=2)
             c = 3
 
-        # automatically resize the image to the next smaller possible size
-        w_scaled, h_scaled = self.img_size
-
-        # w_scaled = w_orig - (w_orig % 8)
-        np_img_resized = cv2.resize(np_img_orig, (w_scaled, h_scaled))
+        # if True:
+        #     # w_scaled = w_orig - (w_orig % 8)
+        #     # This line seems to result in a memory leak
+        #     # np_img_resized = cv2.resize(np_img_orig, (w_scaled, h_scaled))
+        #     # np_img_resized = cv2.resize(np_img_orig, (w_scaled, h_scaled), interpolation=cv2.INTER_LINEAR)
+        #     np_img_resized = np_img_orig[:w_scaled, :h_scaled, :]
+        #     rospy.loginfo(np_img_resized.shape)
+        # else:
+        #     np_img_resized = np.zeros((w_scaled, h_scaled, 3), dtype=np.uint8)
+        np_img_resized = np_img_orig
 
         # conversion to torch tensor (copied from original yolov7 repo)
         img = np_img_resized.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
@@ -138,8 +142,8 @@ class Yolov7Publisher:
 
         # inference & rescaling the output to original img size
         detections = self.model.inference(img)
-        detections[:, :4] = rescale(
-            [h_scaled, w_scaled], detections[:, :4], [h_orig, w_orig])
+
+        # detections[:, :4] = rescale([h_scaled, w_scaled], detections[:, :4], [h_orig, w_orig])
         detections[:, :4] = detections[:, :4].round()
 
         # publishing
@@ -164,7 +168,6 @@ if __name__ == "__main__":
     conf_thresh = rospy.get_param("~conf_thresh")
     iou_thresh = rospy.get_param("~iou_thresh")
     queue_size = rospy.get_param("~queue_size")
-    img_size = rospy.get_param("~img_size")
     visualize = rospy.get_param("~visualize")
     device = rospy.get_param("~device")
 
@@ -181,7 +184,6 @@ if __name__ == "__main__":
         visualize=visualize,
         conf_thresh=conf_thresh,
         iou_thresh=iou_thresh,
-        img_size=(img_size, img_size),
         queue_size=queue_size
     )
 
